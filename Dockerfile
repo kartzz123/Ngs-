@@ -3,7 +3,7 @@ FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 
 # -------------------------------
-# 1. Install dependencies
+# 1. Install dependencies + Salmon
 # -------------------------------
 RUN apt-get update && apt-get install -y \
     fastqc \
@@ -27,6 +27,8 @@ RUN apt-get update && apt-get install -y \
     libxml2-dev \
     libssl-dev \
     build-essential \
+    ca-certificates \
+    salmon \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -35,41 +37,27 @@ RUN apt-get update && apt-get install -y \
 # -------------------------------
 RUN mkdir -p /var/run/sshd && \
     echo 'root:root' | chpasswd && \
-    sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' \
-    /etc/ssh/sshd_config
+    sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
 
 EXPOSE 22
 
 # -------------------------------
-# 3. Install SALMON
-# -------------------------------
-WORKDIR /opt
-
-RUN wget -q http://salmon-tddft.jp/download/SALMON-v.2.2.1.tar.gz && \
-    tar -xzf SALMON-v.2.2.1.tar.gz && \
-    mv SALMON-v.2.2.1 salmon && \
-    rm SALMON-v.2.2.1.tar.gz
-
-ENV PATH="/opt/salmon/bin:${PATH}"
-
-# -------------------------------
-# 4. Download transcriptome
+# 3. Download transcriptome
 # -------------------------------
 WORKDIR /ref
 
-RUN wget -q \
-    https://ftp.ensembl.org/pub/release-115/fasta/homo_sapiens/cdna/Homo_sapiens.GRCh38.cdna.all.fa.gz && \
+RUN wget https://ftp.ensembl.org/pub/release-115/fasta/homo_sapiens/cdna/Homo_sapiens.GRCh38.cdna.all.fa.gz && \
     gunzip Homo_sapiens.GRCh38.cdna.all.fa.gz
 
 # -------------------------------
-# 5. Build Salmon index
+# 4. Build Salmon index
 # -------------------------------
-RUN /opt/salmon/bin/salmon index \
+RUN salmon index \
     -t Homo_sapiens.GRCh38.cdna.all.fa \
     -i salmon_index
 
 # -------------------------------
-# 6. Download SRA data
+# 5. Download SRA data
 # -------------------------------
 WORKDIR /data
 
@@ -78,7 +66,7 @@ RUN prefetch SRR37945512 && \
     gzip *.fastq
 
 # -------------------------------
-# 7. Pipeline script
+# 6. Pipeline script
 # -------------------------------
 WORKDIR /pipeline
 
@@ -112,30 +100,16 @@ for r1 in r1_files:
 
 print("Running FastQC on raw reads...")
 
-subprocess.run([
-    "fastqc",
-    *all_raw,
-    "-o",
-    QC_DIR
-], check=True)
+subprocess.run(["fastqc", *all_raw, "-o", QC_DIR], check=True)
 
 trimmed_pairs = []
 
 for r1 in r1_files:
-
     r2 = r1.replace("_1.fastq.gz", "_2.fastq.gz")
-
     sample = os.path.basename(r1).replace("_1.fastq.gz", "")
 
-    out1 = os.path.join(
-        TRIM_DIR,
-        sample + "_1.trim.fastq.gz"
-    )
-
-    out2 = os.path.join(
-        TRIM_DIR,
-        sample + "_2.trim.fastq.gz"
-    )
+    out1 = os.path.join(TRIM_DIR, sample + "_1.trim.fastq.gz")
+    out2 = os.path.join(TRIM_DIR, sample + "_2.trim.fastq.gz")
 
     subprocess.run([
         "fastp",
@@ -151,32 +125,20 @@ all_trimmed = [f for pair in trimmed_pairs for f in pair]
 
 print("Running FastQC on trimmed reads...")
 
-subprocess.run([
-    "fastqc",
-    *all_trimmed,
-    "-o",
-    QC_DIR
-], check=True)
+subprocess.run(["fastqc", *all_trimmed, "-o", QC_DIR], check=True)
 
 print("Running MultiQC...")
 
-subprocess.run([
-    "multiqc",
-    QC_DIR,
-    "-o",
-    QC_DIR
-], check=True)
+subprocess.run(["multiqc", QC_DIR, "-o", QC_DIR], check=True)
 
 print("Running Salmon quantification...")
 
 for r1, r2 in trimmed_pairs:
-
     sample = os.path.basename(r1).split("_1.trim")[0]
-
     outdir = os.path.join(QUANT_DIR, sample)
 
     subprocess.run([
-        "/opt/salmon/bin/salmon",
+        "salmon",
         "quant",
         "-i", "/ref/salmon_index",
         "-l", "A",
@@ -189,10 +151,9 @@ for r1, r2 in trimmed_pairs:
 print("Pipeline completed successfully!")
 EOF
 
-# Give execute permission
 RUN chmod +x /pipeline/pipeline.py
 
 # -------------------------------
-# 8. Default command
+# 7. Default command
 # -------------------------------
 CMD ["sh", "-c", "service ssh start && python3 /pipeline/pipeline.py"]
