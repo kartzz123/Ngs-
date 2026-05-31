@@ -61,9 +61,9 @@ RUN salmon index \
 # -------------------------------
 WORKDIR /data
 
-RUN prefetch SRR38803505 && \
-    fasterq-dump SRR38803505 --split-files && \
-    gzip *.fastq
+RUN prefetch  SRR38803505 --max-size u && \
+   fasterq-dump SRR38803505 -e 4 && \
+gzip *.fastq
 
 # -------------------------------
 # 6. Pipeline script
