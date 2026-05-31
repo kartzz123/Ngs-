@@ -61,8 +61,8 @@ RUN salmon index \
 # -------------------------------
 WORKDIR /data
 
-RUN prefetch SRR37945512 && \
-    fasterq-dump SRR37945512 --split-files && \
+RUN prefetch SRR38803505 && \
+    fasterq-dump SRR38803505 --split-files && \
     gzip *.fastq
 
 # -------------------------------
