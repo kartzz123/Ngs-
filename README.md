@@ -113,7 +113,7 @@ Transcript Abundance Results
 ## Build Image
 
 ```bash
-docker build -t rnaseq-salmon-pipeline .
+docker build -t kartzz/ngssalmon:latest .
 ```
 
 ---
@@ -123,7 +123,7 @@ docker build -t rnaseq-salmon-pipeline .
 ```bash
 docker run -it --rm \
 -p 2222:22 \
-rnaseq-salmon-pipeline
+kartzz/ngssalmon:latest
 ```
 
 ---
