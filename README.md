@@ -225,14 +225,14 @@ service ssh start && python3 /pipeline/pipeline.py
 Pull the image:
 
 ```bash
-docker pull <dockerhub-username>/rnaseq-salmon-pipeline:latest
+docker pull kartzz/ngssalmon:latest
 ```
 
 Run:
 
 ```bash
 docker run -it --rm -p 2222:22 \
-<dockerhub-username>/rnaseq-salmon-pipeline:latest
+<kartzz>/ngssalmon:latest
 ```
 
 ---
